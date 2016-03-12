@@ -49,7 +49,8 @@
     <Reference Include="Newtonsoft.Json">
       <HintPath>..\..\..\..\..\Storm\Storm\Storm\bin\Debug\Newtonsoft.Json.dll</HintPath>
     </Reference>
-    <Reference Include="StormLoader">
+    <Reference Include="StormLoader, Version=0.1.1.0, Culture=neutral, processorArchitecture=x86">
+      <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\..\..\..\NewStorm\Storm\Storm\Storm\bin\Debug\StormLoader.exe</HintPath>
     </Reference>
     <Reference Include="System" />

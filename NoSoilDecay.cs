@@ -7,7 +7,8 @@ using Storm.StardewValley.Wrapper;
 using Microsoft.Xna.Framework;
 using System.IO;
 using Storm.StardewValley.Accessor;
-
+using System;
+using System.Text.RegularExpressions;
 
 namespace NoSoilDecay
 {
@@ -19,7 +20,9 @@ namespace NoSoilDecay
         public int TimeToSaveNext { get; set; }
         public bool HasDeserializedToday { get; set; }
         public string TileDecayJsonFilePath { get; set; }
-        public ulong CurrentGameId { get; set; }
+        public string CurrentGameId { get; set; }
+        public bool IsFirstRun { get; set; }
+        
 
         public NoSoilDecay()
         {
@@ -41,8 +44,36 @@ namespace NoSoilDecay
         [Subscribe]
         public void OnGameLoadedEvent(PostGameLoadedEvent @e)
         {
-            CurrentGameId = @e.Root.UniqueIDForThisGame;
-            TileDecayJsonFilePath = Path.Combine(ParentPathOnDisk + "\\NoSoilDecay\\SavedTiles\\", CurrentGameId.ToString() + ".json");
+
+            var listOfAtts = new List<string>();
+            var eyeColour = @e.Root.Player.EyeColor.ToString();
+            var hairColour = @e.Root.Player.HairstyleColor.ToString();
+            var hair = @e.Root.Player.Hair.ToString();
+            string name = @e.Root.Player.Name;
+            var farmName = @e.Root.Player.FarmName;
+
+            listOfAtts.Add(eyeColour);
+            listOfAtts.Add(hairColour);
+            listOfAtts.Add(hair);
+            listOfAtts.Add(name);
+            listOfAtts.Add(farmName);
+
+            StringBuilder fileName = new StringBuilder();
+
+            foreach (var l in listOfAtts)
+            {
+                fileName.Append(l);              
+            }
+
+            Regex rgx = new Regex("[^a-zA-Z0-9 -]");
+            var finalFileName = rgx.Replace(fileName.ToString(), "");
+
+            finalFileName = finalFileName.Replace(" ", string.Empty);
+            finalFileName = finalFileName.ToLower();
+
+            CurrentGameId = finalFileName;
+
+            TileDecayJsonFilePath = Path.Combine(ParentPathOnDisk + "\\NoSoilDecay\\SavedTiles\\", CurrentGameId + ".json");
             CheckOrCreateJsonFile();
         }
 
@@ -213,6 +244,7 @@ namespace NoSoilDecay
 public class JsonTerrainFeatures
 {
     public Dictionary<Vector2, int> HoeDirtTile;
+    public long UniqueId { get; set; }
     public JsonTerrainFeatures()
     {
         HoeDirtTile = new Dictionary<Vector2, int>();
