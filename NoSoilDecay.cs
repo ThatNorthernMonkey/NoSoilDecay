@@ -22,17 +22,23 @@ namespace NoSoilDecay
         public string TileDecayJsonFilePath { get; set; }
         public string CurrentGameId { get; set; }
         public bool IsFirstRun { get; set; }
-        
+        public int TimeOfDay { get; set; }
+
+
+
 
         public NoSoilDecay()
         {
             JsonTerrainFeatures = new JsonTerrainFeatures();
+            IsFirstRun = false;
+            HasDeserializedToday = false;
         }
 
         [Subscribe]
         public void Initialize(InitializeEvent @e)
         {
-            HasDeserializedToday = false;
+            
+
         }
 
         [Subscribe]
@@ -42,39 +48,9 @@ namespace NoSoilDecay
         }
 
         [Subscribe]
-        public void OnGameLoadedEvent(PostGameLoadedEvent @e)
+        public void HaveSoilDecaySlowerOnNewDay(PostUpdateEvent @e)
         {
 
-            var listOfAtts = new List<string>();
-            var eyeColour = @e.Root.Player.EyeColor.ToString();
-            var hairColour = @e.Root.Player.HairstyleColor.ToString();
-            var hair = @e.Root.Player.Hair.ToString();
-            string name = @e.Root.Player.Name;
-            var farmName = @e.Root.Player.FarmName;
-
-            listOfAtts.Add(eyeColour);
-            listOfAtts.Add(hairColour);
-            listOfAtts.Add(hair);
-            listOfAtts.Add(name);
-            listOfAtts.Add(farmName);
-
-            StringBuilder fileName = new StringBuilder();
-
-            foreach (var l in listOfAtts)
-            {
-                fileName.Append(l);              
-            }
-
-            Regex rgx = new Regex("[^a-zA-Z0-9 -]");
-            var finalFileName = rgx.Replace(fileName.ToString(), "");
-
-            finalFileName = finalFileName.Replace(" ", string.Empty);
-            finalFileName = finalFileName.ToLower();
-
-            CurrentGameId = finalFileName;
-
-            TileDecayJsonFilePath = Path.Combine(ParentPathOnDisk + "\\NoSoilDecay\\SavedTiles\\", CurrentGameId + ".json");
-            CheckOrCreateJsonFile();
         }
 
         [Subscribe]
@@ -86,71 +62,112 @@ namespace NoSoilDecay
                 // Load the saved state the first time exiting the farmhouse of the day.
                 if (!HasDeserializedToday && @e.Location.Name == "Farm")
                 {
-                    var locations = @e.Root.Locations;
+                    var listOfAtts = new List<string>();
+                    var eyeColour = @e.Root.Player.EyeColor.ToString();
+                    var hairColour = @e.Root.Player.HairstyleColor.ToString();
+                    var hair = @e.Root.Player.Hair.ToString();
+                    string name = @e.Root.Player.Name;
+                    var farmName = @e.Root.Player.FarmName;
 
-                    for (int i = 0; i < @e.Root.Locations.Count; i++)
+                    listOfAtts.Add(eyeColour);
+                    listOfAtts.Add(hairColour);
+                    listOfAtts.Add(hair);
+                    listOfAtts.Add(name);
+                    listOfAtts.Add(farmName);
+
+                    StringBuilder fileName = new StringBuilder();
+
+                    foreach (var l in listOfAtts)
                     {
-                        var loc = locations[i];
+                        fileName.Append(l);
+                    }
 
-                        if (loc.Name == "Farm")
+                    Regex rgx = new Regex("[^a-zA-Z0-9 -]");
+                    var finalFileName = rgx.Replace(fileName.ToString(), "");
+
+                    finalFileName = finalFileName.Replace(" ", string.Empty);
+                    finalFileName = finalFileName.ToLower();
+
+                    CurrentGameId = finalFileName;
+
+                    TileDecayJsonFilePath = Path.Combine(ParentPathOnDisk + "\\NoSoilDecay\\SavedTiles\\", CurrentGameId + ".json");
+                    CheckOrCreateJsonFile();
+
+                    try
+                    {
+                        var locations = @e.Root.Locations;
+
+                        for (int i = 0; i < @e.Root.Locations.Count; i++)
                         {
-                            JsonTerrainFeatures.HoeDirtTile = DeserializeSavedTerrain();
+                            var loc = locations[i];
 
-                            if (JsonTerrainFeatures.HoeDirtTile != null)
+                            if (loc.Name == "Farm")
                             {
-                                var tFeats = @e.Location.TerrainFeatures;
-                                var dirtToCreate = new List<Vector2>();
+                                JsonTerrainFeatures.HoeDirtTile = DeserializeSavedTerrain();
 
-                                foreach (var j in JsonTerrainFeatures.HoeDirtTile)
+                                if (JsonTerrainFeatures.HoeDirtTile != null)
                                 {
-                                    var location = j.Key;
-                                    if (!tFeats.ContainsKey(location))
+                                    var tFeats = @e.Location.TerrainFeatures;
+                                    var dirtToCreate = new List<Vector2>();
+
+                                    foreach (var j in JsonTerrainFeatures.HoeDirtTile)
                                     {
-                                        dirtToCreate.Add(location);
+                                        var location = j.Key;
+                                        if (!tFeats.ContainsKey(location))
+                                        {
+                                            dirtToCreate.Add(location);
+                                        }
                                     }
-                                }
 
-                                foreach (var d in dirtToCreate)
-                                {
-                                    @e.Location.AddHoeDirtAt(d);
-                                }
-
-                                var tFeatsTest = @e.Location.TerrainFeatures;
-
-                                foreach (var j in JsonTerrainFeatures.HoeDirtTile)
-                                {
                                     foreach (var d in dirtToCreate)
                                     {
-                                        if (j.Key == d)
+                                        @e.Location.AddHoeDirtAt(d);
+                                    }
+
+                                    var tFeatsTest = @e.Location.TerrainFeatures;
+
+                                    foreach (var j in JsonTerrainFeatures.HoeDirtTile)
+                                    {
+                                        foreach (var d in dirtToCreate)
                                         {
-                                            tFeatsTest[d].As<HoeDirtAccessor, HoeDirt>().Fertilizer = j.Value;
+                                            if (j.Key == d)
+                                            {
+                                                tFeatsTest[d].As<HoeDirtAccessor, HoeDirt>().Fertilizer = j.Value;
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
+
+                        HasDeserializedToday = true;
                     }
 
-                    HasDeserializedToday = true;
+                    catch (Exception exc)
+                    {
+
+                    }
+
                 }
             }
 
             // Save state every 10 in-game minutes
-            if (TimeLastSaved == 0 && @e.Root.HasLoadedGame)
+            TimeOfDay = @e.Root.TimeOfDay;
+            if (TimeLastSaved == 0)
+            {
+                TimeLastSaved = TimeOfDay;
+                TimeToSaveNext = TimeLastSaved + 10;
+            }
+
+            if (TimeOfDay == 600)
             {
                 TimeLastSaved = @e.Root.TimeOfDay;
                 TimeToSaveNext = TimeLastSaved + 10;
             }
 
-            if (@e.Root.TimeOfDay == 600 && @e.Root.HasLoadedGame)
+            if (@TimeOfDay >= TimeToSaveNext && !IsTimeWonky())
             {
-                TimeLastSaved = @e.Root.TimeOfDay;
-                TimeToSaveNext = TimeLastSaved + 10;
-            }
-
-            if (@e.Root.TimeOfDay >= TimeToSaveNext && @e.Root.HasLoadedGame)
-            {
-                TimeLastSaved = @e.Root.TimeOfDay;
+                TimeLastSaved = @TimeOfDay;
                 TimeToSaveNext = TimeLastSaved + 10;
 
                 //Perform the save.
@@ -238,6 +255,25 @@ namespace NoSoilDecay
             {
                 File.Create(Path.Combine(TileDecayJsonFilePath));
             }
+        }
+
+        public bool IsTimeWonky()
+        {
+            //Bad method name - time is ALWAYS wonky in SV.
+            var time = TimeToSaveNext.ToString();
+            int hour = (int)(TimeToSaveNext.ToString()[0]);
+            time = time.Remove(0, 1);
+            var newTime = Int32.Parse(time);
+            if (newTime >= 60)
+            {
+                hour++;
+                newTime = 00;
+                string timeString = hour.ToString();
+                timeString += newTime.ToString();
+                TimeToSaveNext = Int32.Parse(timeString);
+                return true;
+            }
+            return false;
         }
     }
 }
